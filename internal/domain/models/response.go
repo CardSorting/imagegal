@@ -10,11 +10,13 @@ type ErrorResponse struct {
 // Text2ImgResponse represents the response from the text-to-image endpoint
 type Text2ImgResponse struct {
 	Status         string   `json:"status"`
+	Message        string   `json:"message,omitempty"`
 	GenerationTime float64  `json:"generation_time,omitempty"`
 	Output         []string `json:"output,omitempty"`
 	Images         []string `json:"images,omitempty"`
 	TaskID         string   `json:"task_id,omitempty"`
 	Progress       float64  `json:"progress,omitempty"`
+	ID             int64    `json:"id,omitempty"`
 }
 
 // IsProcessing returns true if the response indicates the request is still processing

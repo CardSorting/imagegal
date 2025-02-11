@@ -134,11 +134,15 @@ func (s *Service) GenerateImage(ctx context.Context, req *models.Text2ImgRequest
 
 	// If the response is in processing state, poll for completion
 	if response.IsProcessing() {
+		if response.ID == 0 {
+			return nil, apperrors.NewExternalAPIError("Processing response missing ID", nil)
+		}
+
 		s.logger.Info("Request is processing, polling for completion",
-			"task_id", response.TaskID,
+			"id", response.ID,
 		)
 
-		finalResponse, err := s.pollForCompletion(ctx, &response)
+		finalResponse, err := s.pollForCompletion(ctx, response.ID)
 		if err != nil {
 			s.logger.Error("Failed while polling for completion", err)
 			return nil, err
@@ -155,7 +159,7 @@ func (s *Service) GenerateImage(ctx context.Context, req *models.Text2ImgRequest
 }
 
 // pollForCompletion polls the API until the image generation is complete or times out
-func (s *Service) pollForCompletion(ctx context.Context, initialResp *models.Text2ImgResponse) (*models.Text2ImgResponse, error) {
+func (s *Service) pollForCompletion(ctx context.Context, id int64) (*models.Text2ImgResponse, error) {
 	maxAttempts := 30 // 30 attempts * 2 second delay = 60 seconds max
 	attempt := 0
 
@@ -174,7 +178,7 @@ func (s *Service) pollForCompletion(ctx context.Context, initialResp *models.Tex
 
 			// Poll for status
 			var response models.Text2ImgResponse
-			if err := s.client.Post(ctx, fmt.Sprintf("/images/status/%s", initialResp.TaskID), nil, &response); err != nil {
+			if err := s.client.Get(ctx, fmt.Sprintf("/images/text2img/%d", id), &response); err != nil {
 				return nil, fmt.Errorf("failed to poll status: %w", err)
 			}
 
@@ -232,25 +236,25 @@ func (s *Service) validateResponse(resp *models.Text2ImgResponse) error {
 		return apperrors.NewExternalAPIError("Empty response from API", nil)
 	}
 
-	// Processing is a valid state
-	if resp.IsProcessing() {
-		if resp.TaskID == "" {
-			return apperrors.NewExternalAPIError("Processing response missing task ID", nil)
-		}
+	switch resp.Status {
+	case "processing":
+		// Processing is a valid state, no additional validation needed
 		return nil
-	}
-
-	// For success responses, validate output
-	if resp.IsSuccess() {
+	case "success":
+		// For success responses, validate output
 		if len(resp.Output) == 0 && len(resp.Images) == 0 {
 			return apperrors.NewExternalAPIError("No images in successful response", nil)
 		}
 		return nil
+	case "error":
+		return apperrors.NewExternalAPIError(
+			fmt.Sprintf("API returned error: %s", resp.Message),
+			nil,
+		)
+	default:
+		return apperrors.NewExternalAPIError(
+			fmt.Sprintf("API returned unexpected status: %s", resp.Status),
+			nil,
+		)
 	}
-
-	// Any other status is an error
-	return apperrors.NewExternalAPIError(
-		fmt.Sprintf("API returned unexpected status: %s", resp.Status),
-		nil,
-	)
 }

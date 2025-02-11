@@ -31,6 +31,8 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 	// Post sends a POST request with JSON body
 	Post(ctx context.Context, path string, body interface{}, response interface{}) error
+	// Get sends a GET request
+	Get(ctx context.Context, path string, response interface{}) error
 }
 
 // Logger defines the interface for logging operations

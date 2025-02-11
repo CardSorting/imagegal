@@ -97,6 +97,41 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
+// Get sends a GET request
+func (c *Client) Get(ctx context.Context, path string, response interface{}) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+path, nil)
+	if err != nil {
+		return apperrors.NewInternalServerError("Failed to create request", err)
+	}
+
+	// Set headers
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+	// Log request details
+	c.logger.Debug("Preparing request",
+		"url", req.URL.String(),
+		"method", "GET",
+	)
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return c.handleErrorResponse(resp.StatusCode, bodyBytes)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
+		return apperrors.NewInternalServerError("Failed to decode response", err)
+	}
+
+	return nil
+}
+
 // Post sends a POST request with JSON body
 func (c *Client) Post(ctx context.Context, path string, body interface{}, response interface{}) error {
 	// Set API key in request body for ModelsLab API
