@@ -3,6 +3,7 @@ package modelslab
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"image/internal/domain/models"
@@ -160,14 +161,15 @@ func (s *Service) GenerateImage(ctx context.Context, req *models.Text2ImgRequest
 
 // pollForCompletion polls the API until the image generation is complete or times out
 func (s *Service) pollForCompletion(ctx context.Context, id int64) (*models.Text2ImgResponse, error) {
-	maxAttempts := 30 // 30 attempts * 2 second delay = 60 seconds max
+	maxAttempts := 10 // Reduced max attempts since we're using exponential backoff
 	attempt := 0
+	baseDelay := 1 * time.Second
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, apperrors.NewExternalAPIError("Request cancelled", ctx.Err())
-		case <-time.After(2 * time.Second): // Wait 2 seconds between attempts
+		case <-time.After(time.Duration(float64(baseDelay) * math.Pow(1.5, float64(attempt)))):
 			attempt++
 			if attempt > maxAttempts {
 				return nil, apperrors.NewExternalAPIError(
@@ -176,29 +178,58 @@ func (s *Service) pollForCompletion(ctx context.Context, id int64) (*models.Text
 				)
 			}
 
-			// Poll for status
-			var response models.Text2ImgResponse
-			if err := s.client.Get(ctx, fmt.Sprintf("/images/text2img/%d", id), &response); err != nil {
-				return nil, fmt.Errorf("failed to poll status: %w", err)
+			// Try different status endpoints in order of likelihood
+			endpoints := []string{
+				fmt.Sprintf("/status/%d", id),
+				fmt.Sprintf("/images/status/%d", id),
+				fmt.Sprintf("/images/text2img/%d", id),
 			}
 
-			// Log progress
-			s.logger.Debug("Polling status",
-				"attempt", attempt,
-				"status", response.Status,
-				"progress", response.Progress,
-			)
+			var lastErr error
+			for _, endpoint := range endpoints {
+				var response models.Text2ImgResponse
+				if err := s.client.Get(ctx, endpoint, &response); err != nil {
+					lastErr = err
+					s.logger.Debug("Status check failed",
+						"endpoint", endpoint,
+						"error", err,
+					)
+					continue
+				}
 
-			// Check if complete
-			if response.IsSuccess() {
-				return &response, nil
-			}
+				// Log progress
+				s.logger.Debug("Polling status",
+					"attempt", attempt,
+					"endpoint", endpoint,
+					"status", response.Status,
+					"progress", response.Progress,
+				)
 
-			// Continue polling if still processing
-			if !response.IsProcessing() {
+				// Check if complete
+				if response.IsSuccess() {
+					return &response, nil
+				}
+
+				// Continue polling if still processing
+				if response.IsProcessing() {
+					break // Found working endpoint, use it for next attempt
+				}
+
+				// Unexpected status
 				return nil, apperrors.NewExternalAPIError(
 					"Unexpected status during polling",
 					fmt.Errorf("status: %s", response.Status),
+				)
+			}
+
+			// All endpoints failed
+			if lastErr != nil {
+				if attempt == maxAttempts {
+					return nil, fmt.Errorf("failed to poll status: %w", lastErr)
+				}
+				s.logger.Debug("All status endpoints failed, retrying with backoff",
+					"attempt", attempt,
+					"next_delay", time.Duration(float64(baseDelay)*math.Pow(1.5, float64(attempt))),
 				)
 			}
 		}

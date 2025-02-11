@@ -120,12 +120,32 @@ func (c *Client) Get(ctx context.Context, path string, response interface{}) err
 	}
 	defer resp.Body.Close()
 
+	// Read response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return apperrors.NewInternalServerError("Failed to read response body", err)
+	}
+
+	// Handle error status codes
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
 		return c.handleErrorResponse(resp.StatusCode, bodyBytes)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
+	// Handle empty response body
+	if len(bodyBytes) == 0 {
+		c.logger.Debug("Empty response body received",
+			"status_code", resp.StatusCode,
+			"url", req.URL.String(),
+		)
+		return nil
+	}
+
+	// Decode response
+	if err := json.Unmarshal(bodyBytes, response); err != nil {
+		c.logger.Debug("Failed to decode response",
+			"body", string(bodyBytes),
+			"error", err,
+		)
 		return apperrors.NewInternalServerError("Failed to decode response", err)
 	}
 
@@ -188,12 +208,32 @@ func (c *Client) Post(ctx context.Context, path string, body interface{}, respon
 	}
 	defer resp.Body.Close()
 
+	// Read response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return apperrors.NewInternalServerError("Failed to read response body", err)
+	}
+
+	// Handle error status codes
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
 		return c.handleErrorResponse(resp.StatusCode, bodyBytes)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
+	// Handle empty response body
+	if len(bodyBytes) == 0 {
+		c.logger.Debug("Empty response body received",
+			"status_code", resp.StatusCode,
+			"url", req.URL.String(),
+		)
+		return nil
+	}
+
+	// Decode response
+	if err := json.Unmarshal(bodyBytes, response); err != nil {
+		c.logger.Debug("Failed to decode response",
+			"body", string(bodyBytes),
+			"error", err,
+		)
 		return apperrors.NewInternalServerError("Failed to decode response", err)
 	}
 
