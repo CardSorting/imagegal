@@ -1,41 +1,65 @@
 package models
 
-// Text2ImgResponse represents the response structure from the text-to-image generation API
-type Text2ImgResponse struct {
-	Status         string      `json:"status"`
-	GenerationTime float64     `json:"generationTime"`
-	ID            int         `json:"id"`
-	Output        []string    `json:"output"`
-	Meta          *MetaData   `json:"meta,omitempty"`
-}
-
-// MetaData represents the metadata included in the API response
-type MetaData struct {
-	Prompt          string      `json:"prompt"`
-	ModelID         string      `json:"model_id"`
-	NegativePrompt  string      `json:"negative_prompt,omitempty"`
-	Scheduler       string      `json:"scheduler"`
-	SafetyChecker   string      `json:"safetychecker"`
-	Width           int         `json:"W"`
-	Height          int         `json:"H"`
-	GuidanceScale   float64     `json:"guidance_scale"`
-	Seed            int64       `json:"seed"`
-	Steps           int         `json:"steps"`
-	Samples         int         `json:"n_samples"`
-	FullURL         string      `json:"full_url"`
-	Upscale         string      `json:"upscale"`
-	Panorama        string      `json:"panorama"`
-	SelfAttention   string      `json:"self_attention"`
-	Embeddings      interface{} `json:"embeddings"`
-	LoraModel       interface{} `json:"lora_model"`
-	LoraStrength    interface{} `json:"lora_strength"`
-	OutputDir       string      `json:"outdir"`
-	FilePrefix      string      `json:"file_prefix"`
-}
-
-// ErrorResponse represents the error response structure
+// ErrorResponse represents an error response from the API
 type ErrorResponse struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
-	Code    string `json:"code,omitempty"`
+	Code    string `json:"code"`
+}
+
+// Text2ImgResponse represents the response from the text-to-image endpoint
+type Text2ImgResponse struct {
+	Status         string   `json:"status"`
+	GenerationTime float64  `json:"generation_time"`
+	Output         []string `json:"output"`
+	Images         []string `json:"images"`
+}
+
+// ModelResponse represents a single model in the API response
+type ModelResponse struct {
+	ID           string               `json:"id"`
+	Name         string               `json:"name"`
+	Capabilities CapabilitiesResponse `json:"capabilities"`
+}
+
+// CapabilitiesResponse represents model capabilities in the API response
+type CapabilitiesResponse struct {
+	MaxWidth            int      `json:"maxWidth"`
+	MaxHeight           int      `json:"maxHeight"`
+	MaxSamples          int      `json:"maxSamples"`
+	MinInferenceSteps   int      `json:"minInferenceSteps"`
+	MaxInferenceSteps   int      `json:"maxInferenceSteps"`
+	SupportedSchedulers []string `json:"supportedSchedulers"`
+	MinGuidanceScale    float64  `json:"minGuidanceScale"`
+	MaxGuidanceScale    float64  `json:"maxGuidanceScale"`
+	SupportsUpscale     bool     `json:"supportsUpscale"`
+	SupportsTomeSD      bool     `json:"supportsTomeSD"`
+	SupportsKarras      bool     `json:"supportsKarras"`
+}
+
+// ModelsResponse represents the response for the models endpoint
+type ModelsResponse struct {
+	Models []ModelResponse `json:"models"`
+}
+
+// ToResponse converts an AIModel to a ModelResponse
+func ToResponse(model AIModel) ModelResponse {
+	caps := model.Capabilities()
+	return ModelResponse{
+		ID:   model.ID(),
+		Name: model.ID(), // Using ID as name since we don't have a separate name field
+		Capabilities: CapabilitiesResponse{
+			MaxWidth:            caps.MaxWidth,
+			MaxHeight:           caps.MaxHeight,
+			MaxSamples:          caps.MaxSamples,
+			MinInferenceSteps:   caps.MinInferenceSteps,
+			MaxInferenceSteps:   caps.MaxInferenceSteps,
+			SupportedSchedulers: caps.SupportedSchedulers,
+			MinGuidanceScale:    caps.MinGuidanceScale,
+			MaxGuidanceScale:    caps.MaxGuidanceScale,
+			SupportsUpscale:     caps.SupportsUpscale,
+			SupportsTomeSD:      caps.SupportsTomeSD,
+			SupportsKarras:      caps.SupportsKarras,
+		},
+	}
 }

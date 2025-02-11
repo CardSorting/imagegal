@@ -51,6 +51,11 @@ func (s *Server) setupRoutes(handlers map[string]ports.Handler) {
 	// API routes
 	api := s.router.PathPrefix("/api/v6").Subrouter()
 
+	// Models endpoint
+	if h, ok := handlers["models"]; ok {
+		api.Handle("/models", s.middleware(h)).Methods(http.MethodGet, http.MethodOptions)
+	}
+
 	// Text to Image endpoint
 	if h, ok := handlers["text2img"]; ok {
 		api.Handle("/images/text2img", s.middleware(h)).Methods(http.MethodPost, http.MethodOptions)

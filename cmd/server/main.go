@@ -10,6 +10,7 @@ import (
 	"image/internal/app"
 	"image/internal/domain/ports"
 	"image/internal/handlers/health"
+	modelshandler "image/internal/handlers/models"
 	"image/internal/handlers/text2img"
 	"image/internal/infrastructure/config"
 	"image/internal/infrastructure/http"
@@ -50,6 +51,7 @@ func main() {
 
 	// Initialize handlers
 	handlers := make(map[string]ports.Handler)
+	handlers["models"] = modelshandler.NewHandler(modelRegistry, appLogger)
 	handlers["text2img"] = text2img.NewHandler(modelsLabService, appLogger)
 	handlers["health"] = health.NewHandler(appLogger)
 
