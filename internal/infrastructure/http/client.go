@@ -100,9 +100,31 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 // Post sends a POST request with JSON body
 func (c *Client) Post(ctx context.Context, path string, body interface{}, response interface{}) error {
 	// Set API key in request body for ModelsLab API
-	if bodyStruct, ok := body.(*models.Text2ImgRequest); ok {
+	if bodyStruct, ok := body.(*models.ModelsLabAPIRequest); ok {
 		bodyStruct.Key = c.apiKey
+		c.logger.Debug("Setting API key for request",
+			"key_length", len(c.apiKey),
+			"path", path,
+		)
 	}
+
+	// Add additional headers for Cloudflare
+	headers := map[string]string{
+		"Content-Type":    "application/json",
+		"Accept":          "application/json",
+		"User-Agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+		"Origin":          "https://modelslab.com",
+		"Referer":         "https://modelslab.com/",
+		"Accept-Language": "en-US,en;q=0.9",
+		"Cache-Control":   "no-cache",
+		"Pragma":          "no-cache",
+	}
+
+	// Log request details
+	c.logger.Debug("Preparing request",
+		"url", c.baseURL+path,
+		"method", "POST",
+	)
 
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
@@ -115,8 +137,9 @@ func (c *Client) Post(ctx context.Context, path string, body interface{}, respon
 	}
 
 	// Set headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)")
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 
 	// Log request body for debugging
 	c.logger.Debug("Request payload",
@@ -144,6 +167,13 @@ func (c *Client) Post(ctx context.Context, path string, body interface{}, respon
 
 // handleErrorResponse processes error responses from the API
 func (c *Client) handleErrorResponse(statusCode int, body []byte) error {
+	// Log raw error response for debugging
+	c.logger.Debug("Received error response",
+		"status_code", statusCode,
+		"body", string(body),
+	)
+
+	// Try to parse as ModelsLab API error
 	var errorResp struct {
 		Status  string `json:"status"`
 		Message string `json:"message"`
@@ -151,18 +181,41 @@ func (c *Client) handleErrorResponse(statusCode int, body []byte) error {
 	}
 
 	if err := json.Unmarshal(body, &errorResp); err != nil {
+		// Check if it's a Cloudflare error page
+		if bytes.Contains(body, []byte("cloudflare")) {
+			return apperrors.NewExternalAPIError(
+				"Request blocked by Cloudflare",
+				fmt.Errorf("status code: %d, possible reasons: rate limiting, invalid headers, or bot detection", statusCode),
+			)
+		}
+
 		return apperrors.NewExternalAPIError(
 			fmt.Sprintf("API error with status code %d", statusCode),
 			fmt.Errorf("raw response: %s", string(body)),
 		)
 	}
 
+	// Log parsed error details
+	c.logger.Debug("Parsed error response",
+		"status", errorResp.Status,
+		"message", errorResp.Message,
+		"code", errorResp.Code,
+	)
+
 	switch statusCode {
 	case http.StatusUnauthorized:
-		return apperrors.NewUnauthorizedError(errorResp.Message, nil)
+		return apperrors.NewUnauthorizedError("Invalid or missing API key", nil)
 	case http.StatusBadRequest:
-		return apperrors.NewInvalidRequestError(errorResp.Message, nil)
+		if errorResp.Message != "" {
+			return apperrors.NewInvalidRequestError(errorResp.Message, nil)
+		}
+		return apperrors.NewInvalidRequestError("Invalid request parameters", nil)
+	case http.StatusTooManyRequests:
+		return apperrors.NewExternalAPIError("Rate limit exceeded", nil)
 	default:
-		return apperrors.NewExternalAPIError(errorResp.Message, nil)
+		if errorResp.Message != "" {
+			return apperrors.NewExternalAPIError(errorResp.Message, nil)
+		}
+		return apperrors.NewExternalAPIError("Unexpected API error", nil)
 	}
 }

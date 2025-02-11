@@ -78,32 +78,41 @@ func (s *Service) GenerateImage(ctx context.Context, req *models.Text2ImgRequest
 
 	// Convert request to ModelsLab API format
 	apiReq := &models.ModelsLabAPIRequest{
-		Key:               req.Key,
 		ModelID:           req.ModelID,
 		Prompt:            req.Prompt,
 		NegativePrompt:    req.NegativePrompt,
-		Width:             fmt.Sprintf("%d", req.Width),
-		Height:            fmt.Sprintf("%d", req.Height),
-		Samples:           fmt.Sprintf("%d", req.Samples),
-		NumInferenceSteps: fmt.Sprintf("%d", req.NumInferenceSteps),
-		SafetyChecker:     req.SafetyChecker,
-		EnhancePrompt:     req.EnhancePrompt,
+		Width:             req.Width,
+		Height:            req.Height,
+		Samples:           req.Samples,
+		NumInferenceSteps: req.NumInferenceSteps,
+		SafetyChecker:     req.SafetyChecker == "yes",
+		EnhancePrompt:     req.EnhancePrompt == "yes",
 		Seed:              req.Seed,
 		GuidanceScale:     req.GuidanceScale,
-		Panorama:          req.Panorama,
-		SelfAttention:     req.SelfAttention,
+		Panorama:          req.Panorama == "yes",
+		SelfAttention:     req.SelfAttention == "yes",
 		Upscale:           req.Upscale,
 		EmbeddingsModel:   req.EmbeddingsModel,
 		LoraModel:         req.LoraModel,
-		Tomesd:            req.Tomesd,
+		Tomesd:            req.Tomesd == "yes",
 		ClipSkip:          req.ClipSkip,
-		UseKarrasSigmas:   req.UseKarrasSigmas,
+		UseKarrasSigmas:   req.UseKarrasSigmas == "yes",
 		Vae:               req.Vae,
 		LoraStrength:      req.LoraStrength,
 		Scheduler:         req.Scheduler,
 		Webhook:           req.Webhook,
 		TrackID:           req.TrackID,
 	}
+
+	// Log the converted request for debugging
+	s.logger.Debug("Converted API request",
+		"model_id", apiReq.ModelID,
+		"width", apiReq.Width,
+		"height", apiReq.Height,
+		"samples", apiReq.Samples,
+		"steps", apiReq.NumInferenceSteps,
+		"scheduler", apiReq.Scheduler,
+	)
 
 	// Initialize response
 	var response models.Text2ImgResponse

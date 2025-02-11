@@ -35,22 +35,22 @@ type ModelsLabAPIRequest struct {
 	ModelID           string  `json:"model_id"`
 	Prompt            string  `json:"prompt"`
 	NegativePrompt    string  `json:"negative_prompt,omitempty"`
-	Width             string  `json:"width"`
-	Height            string  `json:"height"`
-	Samples           string  `json:"samples"`
-	NumInferenceSteps string  `json:"num_inference_steps"`
-	SafetyChecker     string  `json:"safety_checker,omitempty"`
-	EnhancePrompt     string  `json:"enhance_prompt,omitempty"`
+	Width             int     `json:"width"`
+	Height            int     `json:"height"`
+	Samples           int     `json:"samples"`
+	NumInferenceSteps int     `json:"num_inference_steps"`
+	SafetyChecker     bool    `json:"safety_checker,omitempty"`
+	EnhancePrompt     bool    `json:"enhance_prompt,omitempty"`
 	Seed              *int64  `json:"seed,omitempty"`
 	GuidanceScale     float64 `json:"guidance_scale,omitempty"`
-	Panorama          string  `json:"panorama,omitempty"`
-	SelfAttention     string  `json:"self_attention,omitempty"`
+	Panorama          bool    `json:"panorama,omitempty"`
+	SelfAttention     bool    `json:"self_attention,omitempty"`
 	Upscale           string  `json:"upscale,omitempty"`
 	EmbeddingsModel   string  `json:"embeddings_model,omitempty"`
 	LoraModel         string  `json:"lora_model,omitempty"`
-	Tomesd            string  `json:"tomesd,omitempty"`
+	Tomesd            bool    `json:"tomesd,omitempty"`
 	ClipSkip          string  `json:"clip_skip,omitempty"`
-	UseKarrasSigmas   string  `json:"use_karras_sigmas,omitempty"`
+	UseKarrasSigmas   bool    `json:"use_karras_sigmas,omitempty"`
 	Vae               string  `json:"vae,omitempty"`
 	LoraStrength      string  `json:"lora_strength,omitempty"`
 	Scheduler         string  `json:"scheduler,omitempty"`
