@@ -9,17 +9,18 @@ import (
 	"net/http"
 	"time"
 
+	"image/internal/domain/models"
 	"image/internal/domain/ports"
 	apperrors "image/pkg/errors"
 )
 
 // Client implements the HTTPClient interface
 type Client struct {
-	client    *http.Client
-	baseURL   string
-	apiKey    string
+	client     *http.Client
+	baseURL    string
+	apiKey     string
 	maxRetries int
-	logger    ports.Logger
+	logger     ports.Logger
 }
 
 // ClientOption defines a function type for client configuration
@@ -98,6 +99,11 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 
 // Post sends a POST request with JSON body
 func (c *Client) Post(ctx context.Context, path string, body interface{}, response interface{}) error {
+	// Set API key in request body for ModelsLab API
+	if bodyStruct, ok := body.(*models.Text2ImgRequest); ok {
+		bodyStruct.Key = c.apiKey
+	}
+
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return apperrors.NewInvalidRequestError("Failed to marshal request body", err)
@@ -109,8 +115,6 @@ func (c *Client) Post(ctx context.Context, path string, body interface{}, respon
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-
 	resp, err := c.Do(req)
 	if err != nil {
 		return err

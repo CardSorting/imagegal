@@ -3,6 +3,7 @@ package modelslab
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"image/internal/domain/models"
 	"image/internal/domain/ports"
@@ -86,15 +87,31 @@ func (s *Service) validateRequest(req *models.Text2ImgRequest) error {
 		return err
 	}
 
-	// Additional business logic validations
-	if req.Width*req.Height > 1024*1024 {
+	// Parse and validate dimensions
+	width, err := strconv.Atoi(req.Width)
+	if err != nil {
+		return apperrors.NewInvalidRequestError("Invalid width value", err)
+	}
+
+	height, err := strconv.Atoi(req.Height)
+	if err != nil {
+		return apperrors.NewInvalidRequestError("Invalid height value", err)
+	}
+
+	if width*height > 1024*1024 {
 		return apperrors.NewInvalidRequestError(
 			"Image dimensions exceed maximum allowed size",
 			nil,
 		)
 	}
 
-	if req.Samples > 4 {
+	// Parse and validate samples
+	samples, err := strconv.Atoi(req.Samples)
+	if err != nil {
+		return apperrors.NewInvalidRequestError("Invalid samples value", err)
+	}
+
+	if samples > 4 {
 		return apperrors.NewInvalidRequestError(
 			"Maximum number of samples exceeded (max: 4)",
 			nil,
