@@ -28,7 +28,7 @@ export const ImageGenerationForm: React.FC<ImageGenerationFormProps> = ({ onSucc
   const {
     control,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
     reset,
   } = useForm<ImageGenerationFormData>({
     resolver: zodResolver(imageGenerationSchema),
