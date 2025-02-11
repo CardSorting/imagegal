@@ -3,6 +3,7 @@ package modelslab
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"image/internal/domain/models"
 	"image/internal/domain/ports"
@@ -125,10 +126,24 @@ func (s *Service) GenerateImage(ctx context.Context, req *models.Text2ImgRequest
 		return nil, fmt.Errorf("failed to generate image: %w", err)
 	}
 
-	// Validate the response
+	// Handle initial response
 	if err := s.validateResponse(&response); err != nil {
 		s.logger.Error("Invalid response from API", err)
 		return nil, err
+	}
+
+	// If the response is in processing state, poll for completion
+	if response.IsProcessing() {
+		s.logger.Info("Request is processing, polling for completion",
+			"task_id", response.TaskID,
+		)
+
+		finalResponse, err := s.pollForCompletion(ctx, &response)
+		if err != nil {
+			s.logger.Error("Failed while polling for completion", err)
+			return nil, err
+		}
+		response = *finalResponse
 	}
 
 	s.logger.Info("Successfully generated image",
@@ -137,6 +152,53 @@ func (s *Service) GenerateImage(ctx context.Context, req *models.Text2ImgRequest
 	)
 
 	return &response, nil
+}
+
+// pollForCompletion polls the API until the image generation is complete or times out
+func (s *Service) pollForCompletion(ctx context.Context, initialResp *models.Text2ImgResponse) (*models.Text2ImgResponse, error) {
+	maxAttempts := 30 // 30 attempts * 2 second delay = 60 seconds max
+	attempt := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, apperrors.NewExternalAPIError("Request cancelled", ctx.Err())
+		case <-time.After(2 * time.Second): // Wait 2 seconds between attempts
+			attempt++
+			if attempt > maxAttempts {
+				return nil, apperrors.NewExternalAPIError(
+					"Image generation timed out",
+					fmt.Errorf("exceeded maximum polling attempts (%d)", maxAttempts),
+				)
+			}
+
+			// Poll for status
+			var response models.Text2ImgResponse
+			if err := s.client.Post(ctx, fmt.Sprintf("/images/status/%s", initialResp.TaskID), nil, &response); err != nil {
+				return nil, fmt.Errorf("failed to poll status: %w", err)
+			}
+
+			// Log progress
+			s.logger.Debug("Polling status",
+				"attempt", attempt,
+				"status", response.Status,
+				"progress", response.Progress,
+			)
+
+			// Check if complete
+			if response.IsSuccess() {
+				return &response, nil
+			}
+
+			// Continue polling if still processing
+			if !response.IsProcessing() {
+				return nil, apperrors.NewExternalAPIError(
+					"Unexpected status during polling",
+					fmt.Errorf("status: %s", response.Status),
+				)
+			}
+		}
+	}
 }
 
 // validateRequest performs validation on the request
@@ -170,16 +232,25 @@ func (s *Service) validateResponse(resp *models.Text2ImgResponse) error {
 		return apperrors.NewExternalAPIError("Empty response from API", nil)
 	}
 
-	if resp.Status != "success" {
-		return apperrors.NewExternalAPIError(
-			fmt.Sprintf("API returned non-success status: %s", resp.Status),
-			nil,
-		)
+	// Processing is a valid state
+	if resp.IsProcessing() {
+		if resp.TaskID == "" {
+			return apperrors.NewExternalAPIError("Processing response missing task ID", nil)
+		}
+		return nil
 	}
 
-	if len(resp.Output) == 0 {
-		return apperrors.NewExternalAPIError("No images generated", nil)
+	// For success responses, validate output
+	if resp.IsSuccess() {
+		if len(resp.Output) == 0 && len(resp.Images) == 0 {
+			return apperrors.NewExternalAPIError("No images in successful response", nil)
+		}
+		return nil
 	}
 
-	return nil
+	// Any other status is an error
+	return apperrors.NewExternalAPIError(
+		fmt.Sprintf("API returned unexpected status: %s", resp.Status),
+		nil,
+	)
 }

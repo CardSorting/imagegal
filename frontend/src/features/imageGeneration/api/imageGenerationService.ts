@@ -43,7 +43,36 @@ export class ImageGenerationService {
       request
     );
 
+    // If the response is in processing state, poll for completion
+    if (response.data.status === 'processing' && response.data.task_id) {
+      return this.pollForCompletion(response.data.task_id);
+    }
+
     return response.data;
+  }
+
+  private async pollForCompletion(taskId: string): Promise<ImageGenerationResponse> {
+    const maxAttempts = 30; // 30 attempts * 2 second delay = 60 seconds max
+    let attempt = 0;
+
+    while (attempt < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds between attempts
+      attempt++;
+
+      const response = await apiClient.get<ImageGenerationResponse>(
+        `${this.baseUrl}/images/status/${taskId}`
+      );
+
+      if (response.data.status === 'success') {
+        return response.data;
+      }
+
+      if (response.data.status !== 'processing') {
+        throw new Error(`Unexpected status: ${response.data.status}`);
+      }
+    }
+
+    throw new Error('Image generation timed out');
   }
 
   private getOptionalParams(options: ImageGenerationOptions): Partial<ImageGenerationRequest> {

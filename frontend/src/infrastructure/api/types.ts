@@ -31,9 +31,11 @@ export interface ImageGenerationRequest {
 
 export interface ImageGenerationResponse {
   status: string;
-  generationTime: number;
-  id: number;
-  output: string[];
+  generationTime?: number;
+  id?: number;
+  output?: string[];
+  task_id?: string;
+  progress?: number;
   meta?: {
     prompt: string;
     model_id: string;

@@ -10,9 +10,21 @@ type ErrorResponse struct {
 // Text2ImgResponse represents the response from the text-to-image endpoint
 type Text2ImgResponse struct {
 	Status         string   `json:"status"`
-	GenerationTime float64  `json:"generation_time"`
-	Output         []string `json:"output"`
-	Images         []string `json:"images"`
+	GenerationTime float64  `json:"generation_time,omitempty"`
+	Output         []string `json:"output,omitempty"`
+	Images         []string `json:"images,omitempty"`
+	TaskID         string   `json:"task_id,omitempty"`
+	Progress       float64  `json:"progress,omitempty"`
+}
+
+// IsProcessing returns true if the response indicates the request is still processing
+func (r *Text2ImgResponse) IsProcessing() bool {
+	return r.Status == "processing"
+}
+
+// IsSuccess returns true if the response indicates success
+func (r *Text2ImgResponse) IsSuccess() bool {
+	return r.Status == "success"
 }
 
 // ModelResponse represents a single model in the API response
