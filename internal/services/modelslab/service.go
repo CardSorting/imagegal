@@ -19,14 +19,20 @@ type Service struct {
 	client    ports.HTTPClient
 	validator *validation.Validator
 	logger    ports.Logger
+	registry  ports.ModelRegistry
 }
 
 // NewService creates a new ModelsLab service instance
-func NewService(client ports.HTTPClient, validator *validation.Validator, logger ports.Logger) *Service {
+func NewService(client ports.HTTPClient, validator *validation.Validator, logger ports.Logger, registry ports.ModelRegistry) *Service {
+	// Initialize registry with supported models
+	registry.Register(models.NewMidjourneyModel())
+	registry.Register(models.NewFluxModel())
+
 	return &Service{
 		client:    client,
 		validator: validator,
 		logger:    logger,
+		registry:  registry,
 	}
 }
 
@@ -52,6 +58,21 @@ func (s *Service) GenerateImage(ctx context.Context, req *models.Text2ImgRequest
 	}
 
 	if err := s.validator.ValidateEnhancePrompt(req.EnhancePrompt); err != nil {
+		return nil, err
+	}
+
+	// Get and validate the model
+	model, err := s.registry.Get(req.ModelID)
+	if err != nil {
+		s.logger.Error("Invalid model ID", err)
+		return nil, err
+	}
+
+	// Validate request against model capabilities
+	if err := model.ValidateRequest(req); err != nil {
+		s.logger.Error("Request validation failed for model", err,
+			"model_id", req.ModelID,
+		)
 		return nil, err
 	}
 

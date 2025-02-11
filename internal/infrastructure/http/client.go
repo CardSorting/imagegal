@@ -114,7 +114,16 @@ func (c *Client) Post(ctx context.Context, path string, body interface{}, respon
 		return apperrors.NewInternalServerError("Failed to create request", err)
 	}
 
+	// Set headers
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)")
+
+	// Log request body for debugging
+	c.logger.Debug("Request payload",
+		"body", string(jsonBody),
+		"url", req.URL.String(),
+	)
+
 	resp, err := c.Do(req)
 	if err != nil {
 		return err

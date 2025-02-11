@@ -13,6 +13,7 @@ import (
 	"image/internal/handlers/text2img"
 	"image/internal/infrastructure/config"
 	"image/internal/infrastructure/http"
+	registry "image/internal/infrastructure/registry"
 	"image/internal/infrastructure/validation"
 	"image/internal/services/modelslab"
 	"image/pkg/logger"
@@ -41,8 +42,11 @@ func main() {
 		http.WithTimeout(30*time.Second),
 	)
 
+	// Initialize model registry
+	modelRegistry := registry.NewModelRegistry()
+
 	// Initialize services
-	modelsLabService := modelslab.NewService(httpClient, validator, appLogger)
+	modelsLabService := modelslab.NewService(httpClient, validator, appLogger, modelRegistry)
 
 	// Initialize handlers
 	handlers := make(map[string]ports.Handler)
