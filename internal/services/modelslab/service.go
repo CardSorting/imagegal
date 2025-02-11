@@ -3,7 +3,6 @@ package modelslab
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"image/internal/domain/models"
 	"image/internal/domain/ports"
@@ -56,11 +55,40 @@ func (s *Service) GenerateImage(ctx context.Context, req *models.Text2ImgRequest
 		return nil, err
 	}
 
+	// Convert request to ModelsLab API format
+	apiReq := &models.ModelsLabAPIRequest{
+		Key:               req.Key,
+		ModelID:           req.ModelID,
+		Prompt:            req.Prompt,
+		NegativePrompt:    req.NegativePrompt,
+		Width:             fmt.Sprintf("%d", req.Width),
+		Height:            fmt.Sprintf("%d", req.Height),
+		Samples:           fmt.Sprintf("%d", req.Samples),
+		NumInferenceSteps: fmt.Sprintf("%d", req.NumInferenceSteps),
+		SafetyChecker:     req.SafetyChecker,
+		EnhancePrompt:     req.EnhancePrompt,
+		Seed:              req.Seed,
+		GuidanceScale:     req.GuidanceScale,
+		Panorama:          req.Panorama,
+		SelfAttention:     req.SelfAttention,
+		Upscale:           req.Upscale,
+		EmbeddingsModel:   req.EmbeddingsModel,
+		LoraModel:         req.LoraModel,
+		Tomesd:            req.Tomesd,
+		ClipSkip:          req.ClipSkip,
+		UseKarrasSigmas:   req.UseKarrasSigmas,
+		Vae:               req.Vae,
+		LoraStrength:      req.LoraStrength,
+		Scheduler:         req.Scheduler,
+		Webhook:           req.Webhook,
+		TrackID:           req.TrackID,
+	}
+
 	// Initialize response
 	var response models.Text2ImgResponse
 
 	// Call the ModelsLab API
-	if err := s.client.Post(ctx, text2ImgEndpoint, req, &response); err != nil {
+	if err := s.client.Post(ctx, text2ImgEndpoint, apiReq, &response); err != nil {
 		s.logger.Error("Failed to generate image", err,
 			"model_id", req.ModelID,
 		)
@@ -87,31 +115,16 @@ func (s *Service) validateRequest(req *models.Text2ImgRequest) error {
 		return err
 	}
 
-	// Parse and validate dimensions
-	width, err := strconv.Atoi(req.Width)
-	if err != nil {
-		return apperrors.NewInvalidRequestError("Invalid width value", err)
-	}
-
-	height, err := strconv.Atoi(req.Height)
-	if err != nil {
-		return apperrors.NewInvalidRequestError("Invalid height value", err)
-	}
-
-	if width*height > 1024*1024 {
+	// Validate dimensions
+	if req.Width*req.Height > 1024*1024 {
 		return apperrors.NewInvalidRequestError(
 			"Image dimensions exceed maximum allowed size",
 			nil,
 		)
 	}
 
-	// Parse and validate samples
-	samples, err := strconv.Atoi(req.Samples)
-	if err != nil {
-		return apperrors.NewInvalidRequestError("Invalid samples value", err)
-	}
-
-	if samples > 4 {
+	// Validate samples
+	if req.Samples > 4 {
 		return apperrors.NewInvalidRequestError(
 			"Maximum number of samples exceeded (max: 4)",
 			nil,

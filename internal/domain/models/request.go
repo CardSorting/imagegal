@@ -6,10 +6,10 @@ type Text2ImgRequest struct {
 	ModelID           string  `json:"model_id" validate:"required"`
 	Prompt            string  `json:"prompt" validate:"required"`
 	NegativePrompt    string  `json:"negative_prompt,omitempty"`
-	Width             string  `json:"width" validate:"required"`
-	Height            string  `json:"height" validate:"required"`
-	Samples           string  `json:"samples" validate:"required"`
-	NumInferenceSteps string  `json:"num_inference_steps" validate:"required"`
+	Width             int     `json:"width" validate:"required,min=64,max=1024"`
+	Height            int     `json:"height" validate:"required,min=64,max=1024"`
+	Samples           int     `json:"samples" validate:"required,min=1,max=4"`
+	NumInferenceSteps int     `json:"num_inference_steps" validate:"required,min=1,max=20"`
 	SafetyChecker     string  `json:"safety_checker" validate:"omitempty,oneof=yes no"`
 	EnhancePrompt     string  `json:"enhance_prompt" validate:"omitempty,oneof=yes no"`
 	Seed              *int64  `json:"seed,omitempty"`
@@ -22,6 +22,35 @@ type Text2ImgRequest struct {
 	Tomesd            string  `json:"tomesd" validate:"omitempty,oneof=yes no"`
 	ClipSkip          string  `json:"clip_skip,omitempty"`
 	UseKarrasSigmas   string  `json:"use_karras_sigmas" validate:"omitempty,oneof=yes no"`
+	Vae               string  `json:"vae,omitempty"`
+	LoraStrength      string  `json:"lora_strength,omitempty"`
+	Scheduler         string  `json:"scheduler,omitempty"`
+	Webhook           string  `json:"webhook,omitempty"`
+	TrackID           string  `json:"track_id,omitempty"`
+}
+
+// ModelsLabAPIRequest represents the request structure expected by the ModelsLab API
+type ModelsLabAPIRequest struct {
+	Key               string  `json:"key"`
+	ModelID           string  `json:"model_id"`
+	Prompt            string  `json:"prompt"`
+	NegativePrompt    string  `json:"negative_prompt,omitempty"`
+	Width             string  `json:"width"`
+	Height            string  `json:"height"`
+	Samples           string  `json:"samples"`
+	NumInferenceSteps string  `json:"num_inference_steps"`
+	SafetyChecker     string  `json:"safety_checker,omitempty"`
+	EnhancePrompt     string  `json:"enhance_prompt,omitempty"`
+	Seed              *int64  `json:"seed,omitempty"`
+	GuidanceScale     float64 `json:"guidance_scale,omitempty"`
+	Panorama          string  `json:"panorama,omitempty"`
+	SelfAttention     string  `json:"self_attention,omitempty"`
+	Upscale           string  `json:"upscale,omitempty"`
+	EmbeddingsModel   string  `json:"embeddings_model,omitempty"`
+	LoraModel         string  `json:"lora_model,omitempty"`
+	Tomesd            string  `json:"tomesd,omitempty"`
+	ClipSkip          string  `json:"clip_skip,omitempty"`
+	UseKarrasSigmas   string  `json:"use_karras_sigmas,omitempty"`
 	Vae               string  `json:"vae,omitempty"`
 	LoraStrength      string  `json:"lora_strength,omitempty"`
 	Scheduler         string  `json:"scheduler,omitempty"`
