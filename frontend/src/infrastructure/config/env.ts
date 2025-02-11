@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 const envSchema = z.object({
-  VITE_API_URL: z.string().url().default('http://localhost:8080'),
+  VITE_API_URL: z.string().default('http://localhost:8080'),
   VITE_DEFAULT_MODEL: z.string().default('flux'),
   MODE: z.enum(['development', 'production', 'test']).default('development'),
 })

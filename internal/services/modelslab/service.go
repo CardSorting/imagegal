@@ -51,7 +51,7 @@ func (s *Service) GenerateImage(ctx context.Context, req *models.Text2ImgRequest
 		return nil, err
 	}
 
-	if err := s.validator.ValidateEnhanceStyle(req.EnhancePrompt); err != nil {
+	if err := s.validator.ValidateEnhancePrompt(req.EnhancePrompt); err != nil {
 		return nil, err
 	}
 

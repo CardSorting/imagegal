@@ -5,8 +5,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/go-playground/validator/v10"
 	apperrors "image/pkg/errors"
+
+	"github.com/go-playground/validator/v10"
 )
 
 // Validator represents a validator instance
@@ -17,7 +18,7 @@ type Validator struct {
 // New creates a new validator instance
 func New() *Validator {
 	v := validator.New()
-	
+
 	// Register custom validation tags if needed
 	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
 		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
@@ -72,9 +73,9 @@ func (v *Validator) handleValidationErrors(errors validator.ValidationErrors) er
 // ValidateScheduler validates the scheduler name
 func (v *Validator) ValidateScheduler(scheduler string) error {
 	validSchedulers := map[string]bool{
-		"DDPMScheduler":                    true,
-		"DDIMScheduler":                    true,
-		"PNDMScheduler":                    true,
+		"DDPMScheduler":                   true,
+		"DDIMScheduler":                   true,
+		"PNDMScheduler":                   true,
 		"LMSDiscreteScheduler":            true,
 		"EulerDiscreteScheduler":          true,
 		"EulerAncestralDiscreteScheduler": true,
@@ -102,22 +103,20 @@ func (v *Validator) ValidateScheduler(scheduler string) error {
 	return nil
 }
 
-// ValidateEnhanceStyle validates the enhance style value
-func (v *Validator) ValidateEnhanceStyle(style string) error {
-	if style == "" {
+// ValidateEnhancePrompt validates the enhance prompt value
+func (v *Validator) ValidateEnhancePrompt(value string) error {
+	if value == "" {
 		return nil
 	}
 
-	validStyles := map[string]bool{
-		"enhance": true, "cinematic-diva": true, "nude": true, "nsfw": true,
-		"sex": true, "abstract-expressionism": true, "academia": true,
-		"action-figure": true, "adorable-3d-character": true,
-		// ... add other valid styles as needed
+	validValues := map[string]bool{
+		"yes": true,
+		"no":  true,
 	}
 
-	if !validStyles[style] {
+	if !validValues[value] {
 		return apperrors.NewInvalidRequestError(
-			fmt.Sprintf("Invalid enhance style: %s", style),
+			fmt.Sprintf("Invalid enhance_prompt value: %s (must be 'yes' or 'no')", value),
 			nil,
 		)
 	}
