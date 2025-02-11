@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'react-hot-toast';
 import { ImageGenerationResponse } from '@/infrastructure/api/types';
-
+import { useModel } from '../context/ModelContext';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Slider } from '@/shared/components/Slider';
@@ -11,13 +11,13 @@ import { Textarea } from '@/shared/components/Textarea';
 import { Select } from '@/shared/components/Select';
 import { Switch } from '@/shared/components/Switch';
 import { ProgressSpinner } from '@/shared/components/Spinner';
+import { ModelSelector } from './ModelSelector';
 
 import { useImageGeneration } from '../hooks/useImageGeneration';
 import { 
-  imageGenerationSchema, 
+  createImageGenerationSchema, 
   type ImageGenerationFormData,
-  defaultFormValues,
-  schedulerOptions 
+  getDefaultFormValues,
 } from '../validation/schema';
 
 interface ImageGenerationFormProps {
@@ -25,17 +25,25 @@ interface ImageGenerationFormProps {
 }
 
 export const ImageGenerationForm: React.FC<ImageGenerationFormProps> = ({ onSuccess }) => {
+  const { selectedModel, capabilities } = useModel();
   const {
     control,
     handleSubmit,
     formState: { errors },
     reset,
   } = useForm<ImageGenerationFormData>({
-    resolver: zodResolver(imageGenerationSchema),
-    defaultValues: defaultFormValues,
+    resolver: zodResolver(createImageGenerationSchema(capabilities)),
+    defaultValues: getDefaultFormValues(capabilities),
   });
 
   const { generate, isGenerating, progress } = useImageGeneration();
+
+  // Reset form when model changes
+  useEffect(() => {
+    if (selectedModel) {
+      reset(getDefaultFormValues(capabilities));
+    }
+  }, [selectedModel, capabilities, reset]);
 
   const onSubmit = async (data: ImageGenerationFormData) => {
     try {
@@ -50,13 +58,15 @@ export const ImageGenerationForm: React.FC<ImageGenerationFormProps> = ({ onSucc
     }
   };
 
-  const schedulerSelectOptions = schedulerOptions.map(scheduler => ({
+  const schedulerSelectOptions = capabilities.supportedSchedulers.map(scheduler => ({
     value: scheduler,
     label: scheduler,
   }));
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl mx-auto">
+      <ModelSelector />
+      
       <Controller
         name="prompt"
         control={control}
@@ -90,11 +100,11 @@ export const ImageGenerationForm: React.FC<ImageGenerationFormProps> = ({ onSucc
           name="width"
           control={control}
           render={({ field: { onChange, ...field } }) => (
-            <Slider
-              label="Width"
-              error={errors.width?.message}
-              min={64}
-              max={1024}
+          <Slider
+            label="Width"
+            error={errors.width?.message}
+            min={64}
+            max={capabilities.maxWidth}
               step={64}
               valueSuffix="px"
               helperText="Image width in pixels (must be divisible by 64)"
@@ -108,11 +118,11 @@ export const ImageGenerationForm: React.FC<ImageGenerationFormProps> = ({ onSucc
           name="height"
           control={control}
           render={({ field: { onChange, ...field } }) => (
-            <Slider
-              label="Height"
-              error={errors.height?.message}
-              min={64}
-              max={1024}
+          <Slider
+            label="Height"
+            error={errors.height?.message}
+            min={64}
+            max={capabilities.maxHeight}
               step={64}
               valueSuffix="px"
               helperText="Image height in pixels (must be divisible by 64)"
@@ -132,7 +142,7 @@ export const ImageGenerationForm: React.FC<ImageGenerationFormProps> = ({ onSucc
               label="Number of Images"
               error={errors.samples?.message}
               min={1}
-              max={4}
+              max={capabilities.maxSamples}
               step={1}
               helperText="Number of images to generate in one request"
               onChange={(e) => onChange(parseInt(e.target.value, 10))}
@@ -149,7 +159,7 @@ export const ImageGenerationForm: React.FC<ImageGenerationFormProps> = ({ onSucc
               label="Inference Steps"
               error={errors.num_inference_steps?.message}
               min={1}
-              max={20}
+              max={capabilities.maxInferenceSteps}
               step={1}
               helperText="More steps generally means higher quality but slower generation"
               onChange={(e) => onChange(parseInt(e.target.value, 10))}
@@ -181,7 +191,7 @@ export const ImageGenerationForm: React.FC<ImageGenerationFormProps> = ({ onSucc
               label="Guidance Scale"
               error={errors.guidance_scale?.message}
               min={1}
-              max={20}
+              max={capabilities.maxGuidanceScale}
               step={0.1}
               helperText="How closely to follow the prompt (higher = more strict)"
               onChange={(e) => onChange(parseFloat(e.target.value))}
@@ -240,11 +250,62 @@ export const ImageGenerationForm: React.FC<ImageGenerationFormProps> = ({ onSucc
         />
       </div>
 
+      {capabilities.supportsTomeSD && (
+        <Controller
+          name="tomesd"
+          control={control}
+          render={({ field: { value, onChange, ...field } }) => (
+            <Switch
+              label="TomeSD"
+              description="Enable TomeSD optimization"
+              checked={value === 'yes'}
+              onChange={(e) => onChange(e.target.checked ? 'yes' : 'no')}
+              {...field}
+            />
+          )}
+        />
+      )}
+
+      {capabilities.supportsKarras && (
+        <Controller
+          name="use_karras_sigmas"
+          control={control}
+          render={({ field: { value, onChange, ...field } }) => (
+            <Switch
+              label="Karras Sigmas"
+              description="Use Karras noise schedule"
+              checked={value === 'yes'}
+              onChange={(e) => onChange(e.target.checked ? 'yes' : 'no')}
+              {...field}
+            />
+          )}
+        />
+      )}
+
+      {capabilities.supportsUpscale && (
+        <Controller
+          name="upscale"
+          control={control}
+          render={({ field }) => (
+            <Select
+              label="Upscale Factor"
+              options={[
+                { value: '1', label: '1x' },
+                { value: '2', label: '2x' },
+                { value: '3', label: '3x' },
+              ]}
+              error={errors.upscale?.message}
+              {...field}
+            />
+          )}
+        />
+      )}
+
       <div className="flex justify-between items-center pt-4">
         <Button
           type="button"
           variant="secondary"
-          onClick={() => reset(defaultFormValues)}
+          onClick={() => reset(getDefaultFormValues(capabilities))}
           disabled={isGenerating}
         >
           Reset

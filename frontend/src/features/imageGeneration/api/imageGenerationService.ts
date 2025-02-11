@@ -1,5 +1,6 @@
 import { apiClient } from '@/infrastructure/api/client';
 import { ImageGenerationRequest, ImageGenerationResponse } from '@/infrastructure/api/types';
+import { ModelsResponse, ModelCapabilities } from '../types/model';
 import { env } from '@/infrastructure/config/env';
 
 export interface ImageGenerationOptions extends Omit<ImageGenerationRequest, 'model_id'> {
@@ -8,7 +9,7 @@ export interface ImageGenerationOptions extends Omit<ImageGenerationRequest, 'mo
 
 export class ImageGenerationService {
   private static instance: ImageGenerationService;
-  private readonly baseUrl = '/api/v6/images';
+  private readonly baseUrl = '/api/v6';
 
   private constructor() {}
 
@@ -17,6 +18,13 @@ export class ImageGenerationService {
       ImageGenerationService.instance = new ImageGenerationService();
     }
     return ImageGenerationService.instance;
+  }
+
+  public async getAvailableModels(): Promise<ModelsResponse> {
+    const response = await apiClient.get<ModelsResponse>(
+      `${this.baseUrl}/models`
+    );
+    return response.data;
   }
 
   public async generateImage(options: ImageGenerationOptions): Promise<ImageGenerationResponse> {
@@ -31,7 +39,7 @@ export class ImageGenerationService {
     };
 
     const response = await apiClient.post<ImageGenerationResponse>(
-      `${this.baseUrl}/text2img`,
+      `${this.baseUrl}/images/text2img`,
       request
     );
 
@@ -57,18 +65,18 @@ export class ImageGenerationService {
     return optionalParams;
   }
 
-  public async getDefaultSettings(): Promise<Partial<ImageGenerationOptions>> {
+  public async getDefaultSettings(capabilities: ModelCapabilities): Promise<Partial<ImageGenerationOptions>> {
     return {
-      width: 512,
-      height: 512,
+      width: Math.min(512, capabilities.maxWidth),
+      height: Math.min(512, capabilities.maxHeight),
       samples: 1,
-      num_inference_steps: 30,
+      num_inference_steps: Math.min(30, capabilities.maxInferenceSteps),
       safety_checker: 'no',
       enhance_prompt: 'yes',
-      guidance_scale: 7.5,
-      scheduler: 'UniPCMultistepScheduler',
-      tomesd: 'yes',
-      use_karras_sigmas: 'yes',
+      guidance_scale: Math.min(7.5, capabilities.maxGuidanceScale),
+      scheduler: capabilities.supportedSchedulers[0],
+      tomesd: capabilities.supportsTomeSD ? 'yes' : undefined,
+      use_karras_sigmas: capabilities.supportsKarras ? 'yes' : undefined,
     };
   }
 }

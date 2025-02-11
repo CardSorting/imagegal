@@ -3,6 +3,7 @@ import { imageGenerationService, ImageGenerationOptions } from '../api/imageGene
 import { ImageGenerationResponse } from '@/infrastructure/api/types';
 import { ApiException } from '@/infrastructure/api/types';
 import { useState } from 'react';
+import { useModel } from '../context/ModelContext';
 
 export interface UseImageGenerationResult {
   generate: (options: ImageGenerationOptions) => Promise<ImageGenerationResponse>;
@@ -15,11 +16,16 @@ export interface UseImageGenerationResult {
 
 export function useImageGeneration(): UseImageGenerationResult {
   const queryClient = useQueryClient();
+  const { selectedModel } = useModel();
   const [lastGeneratedImage, setLastGeneratedImage] = useState<ImageGenerationResponse | null>(null);
   const [progress, setProgress] = useState<number>(0);
 
   const mutation = useMutation<ImageGenerationResponse, ApiException, ImageGenerationOptions>({
     mutationFn: async (options) => {
+      if (!selectedModel) {
+        throw new Error('No model selected');
+      }
+
       try {
         // Reset state
         setProgress(0);
@@ -32,8 +38,11 @@ export function useImageGeneration(): UseImageGenerationResult {
           });
         }, 500);
 
-        // Generate image
-        const response = await imageGenerationService.generateImage(options);
+        // Generate image with selected model
+        const response = await imageGenerationService.generateImage({
+          ...options,
+          model_id: selectedModel.id,
+        });
         
         // Cleanup and finalize progress
         clearInterval(progressInterval);
@@ -68,7 +77,9 @@ export function useImageGeneration(): UseImageGenerationResult {
 
 // Custom hook for default settings
 export function useDefaultSettings() {
+  const { capabilities } = useModel();
+  
   return {
-    getDefaults: imageGenerationService.getDefaultSettings,
+    getDefaults: () => imageGenerationService.getDefaultSettings(capabilities),
   };
 }

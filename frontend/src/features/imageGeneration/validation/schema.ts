@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { ModelCapabilities } from '../types/model';
 
-export const imageGenerationSchema = z.object({
+export const createImageGenerationSchema = (capabilities: ModelCapabilities) => z.object({
   prompt: z.string()
     .min(1, 'Prompt is required')
     .max(1000, 'Prompt must be less than 1000 characters'),
@@ -12,22 +13,22 @@ export const imageGenerationSchema = z.object({
   width: z.number()
     .int()
     .min(64, 'Width must be at least 64 pixels')
-    .max(1024, 'Width must be at most 1024 pixels'),
+    .max(capabilities.maxWidth, `Width must be at most ${capabilities.maxWidth} pixels`),
   
   height: z.number()
     .int()
     .min(64, 'Height must be at least 64 pixels')
-    .max(1024, 'Height must be at most 1024 pixels'),
+    .max(capabilities.maxHeight, `Height must be at most ${capabilities.maxHeight} pixels`),
   
   samples: z.number()
     .int()
     .min(1, 'Must generate at least 1 image')
-    .max(4, 'Can generate at most 4 images'),
+    .max(capabilities.maxSamples, `Can generate at most ${capabilities.maxSamples} images`),
   
   num_inference_steps: z.number()
     .int()
-    .min(1, 'Steps must be at least 1')
-    .max(20, 'Steps must be at most 20'),
+    .min(capabilities.minInferenceSteps, `Steps must be at least ${capabilities.minInferenceSteps}`)
+    .max(capabilities.maxInferenceSteps, `Steps must be at most ${capabilities.maxInferenceSteps}`),
   
   safety_checker: z.enum(['yes', 'no']).optional(),
   enhance_prompt: z.enum(['yes', 'no']).optional(),
@@ -35,33 +36,40 @@ export const imageGenerationSchema = z.object({
   seed: z.number().int().nullable().optional(),
   
   guidance_scale: z.number()
-    .min(1, 'Guidance scale must be at least 1')
-    .max(20, 'Guidance scale must be at most 20')
+    .min(capabilities.minGuidanceScale, `Guidance scale must be at least ${capabilities.minGuidanceScale}`)
+    .max(capabilities.maxGuidanceScale, `Guidance scale must be at most ${capabilities.maxGuidanceScale}`)
     .optional(),
   
-  scheduler: z.string().optional(),
+  scheduler: z.enum(capabilities.supportedSchedulers as [string, ...string[]]).optional(),
   
   panorama: z.enum(['yes', 'no']).optional(),
   self_attention: z.enum(['yes', 'no']).optional(),
-  upscale: z.enum(['1', '2', '3']).optional(),
-  tomesd: z.enum(['yes', 'no']).optional(),
-  use_karras_sigmas: z.enum(['yes', 'no']).optional(),
+  upscale: capabilities.supportsUpscale 
+    ? z.enum(['1', '2', '3']).optional()
+    : z.literal(undefined),
+  tomesd: capabilities.supportsTomeSD 
+    ? z.enum(['yes', 'no']).optional()
+    : z.literal(undefined),
+  
+  use_karras_sigmas: capabilities.supportsKarras 
+    ? z.enum(['yes', 'no']).optional()
+    : z.literal(undefined),
 });
 
-export type ImageGenerationFormData = z.infer<typeof imageGenerationSchema>;
+export type ImageGenerationFormData = z.infer<ReturnType<typeof createImageGenerationSchema>>;
 
-export const defaultFormValues: Partial<ImageGenerationFormData> = {
-  width: 512,
-  height: 512,
+export const getDefaultFormValues = (capabilities: ModelCapabilities): Partial<ImageGenerationFormData> => ({
+  width: Math.min(512, capabilities.maxWidth),
+  height: Math.min(512, capabilities.maxHeight),
   samples: 1,
-  num_inference_steps: 30,
+  num_inference_steps: Math.min(30, capabilities.maxInferenceSteps),
   safety_checker: 'no',
   enhance_prompt: 'yes',
-  guidance_scale: 7.5,
-  scheduler: 'UniPCMultistepScheduler',
-  tomesd: 'yes',
-  use_karras_sigmas: 'yes',
-};
+  guidance_scale: Math.min(7.5, capabilities.maxGuidanceScale),
+  scheduler: capabilities.supportedSchedulers[0],
+  tomesd: capabilities.supportsTomeSD ? 'yes' : undefined,
+  use_karras_sigmas: capabilities.supportsKarras ? 'yes' : undefined,
+});
 
 export const schedulerOptions = [
   'DDPMScheduler',
